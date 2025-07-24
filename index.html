@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -23,6 +22,8 @@
         }
       }
     </script>
+    <!-- Add Babel to translate JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="importmap">
 {
   "imports": {
@@ -36,6 +37,7 @@
 </head>
   <body class="bg-slate-50 text-slate-800 antialiased">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <!-- Tell Babel to transpile this script -->
+    <script type="text/babel" data-type="module" src="/index.tsx"></script>
   </body>
 </html>
