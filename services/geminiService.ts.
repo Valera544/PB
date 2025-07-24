@@ -1,0 +1,146 @@
+
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { ThroughLineData, ValuePropositionData } from "../types";
+
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const model = 'gemini-2.5-flash';
+
+const PROMPT_1_THROUGH_LINE = `
+### Context and Objective
+You are tasked with identifying a through line for a user's personal brand. A through line is the consistent and underlying theme that connects past experiences, decisions, and actions with the present self and future aspirations. Your objective is to analyze the user's interests, competencies, and character traits to determine a cohesive through line that encapsulates their personal brand.
+
+### Style and Tone
+Assume the role of an expert personal branding consultant and career strategist. Your tone should be professional, insightful, and encouraging.
+
+### Input Variables
+<interests>
+{{INTERESTS}}
+</interests>
+<competencies>
+{{COMPETENCIES}}
+</competencies>
+<character_traits>
+{{CHARACTER_TRAITS}}
+</character_traits>
+
+### Response Format
+Provide your response in the following format:
+1. Analysis of Interests
+2. Analysis of Competencies
+3. Analysis of Character Traits
+4. Synthesis and Through Line Identification
+5. Final Through Line Statement
+
+### Output
+Based on your analysis and synthesis, provide a through line that encapsulates the user's personal brand. This should be a concise statement that connects their interests, competencies, and character traits in a meaningful way.
+Present your final through line within <through_line> tags.
+`;
+
+const PROMPT_3_MISSION_VISION = `
+### Context and Objective
+You are an AI assistant tasked with helping a user define their personal brand purpose. The user has provided their "through line," which is a key concept in personal branding. Your objective is to generate three distinct mission statements and three corresponding vision statements based on the user's through line.
+
+### Style and Tone
+Assume the role of an expert personal branding consultant and professional writer. Your tone should be insightful, encouraging, and professional.
+
+### User Input
+<through_line>
+{{THROUGH_LINE}}
+</through_line>
+
+### Response Format
+Provide your response in the following format. Do not add any extra explanations or introductory text. Just provide the XML tags.
+
+<mission_statements>
+1. [First mission statement]
+2. [Second mission statement]
+3. [Third mission statement]
+</mission_statements>
+
+<vision_statements>
+1. [First vision statement]
+2. [Second vision statement]
+3. [Third vision statement]
+</vision_statements>
+`;
+
+const PROMPT_AUDIT_EQUITY = `
+### Context and Objective
+You are an expert personal branding strategist. Your task is to conduct a "Brand Equity Audit" for a user. This involves analyzing the user's self-perception against external feedback collected from their peers, managers, and colleagues. Your goal is to identify the user's perceived strengths, weaknesses, and any gaps or misalignments between how they see themselves and how others see them.
+
+### Style and Tone
+Your tone should be constructive, insightful, and supportive. Frame the analysis to empower the user to build on their strengths and address areas for development. Use clear headings and bullet points to structure your analysis for readability.
+
+### Input Variables
+<self_perception>
+{{SELF_PERCEPTION}}
+</self_perception>
+<external_feedback>
+{{EXTERNAL_FEEDBACK}}
+</external_feedback>
+
+### Response Format
+Provide a comprehensive analysis structured with the following sections. Do not add any introductory text, just the sections. Use markdown for formatting like bold headings.
+
+**Brand Strengths**
+- Based on both self-perception and external feedback, identify and list the key strengths that are consistently recognized.
+
+**Areas for Development**
+- Identify potential weaknesses or areas for improvement. These could be points mentioned in external feedback that are absent from the self-perception, or areas the user acknowledges.
+
+**Perception Gap Analysis**
+- Compare the self-perception and external feedback. Highlight key differences. Are there strengths the user has that they are unaware of? Are there areas where the user's self-perception is more positive than the feedback suggests?
+
+**Strategic Recommendations**
+- Provide 2-3 actionable recommendations for the user to strengthen their personal brand based on this audit. For example, how can they better leverage their strengths or address the perception gaps?
+`;
+
+
+export const geminiService = {
+  generateThroughLine: async (data: ThroughLineData): Promise<{ analysis: string; finalStatement: string }> => {
+    const prompt = PROMPT_1_THROUGH_LINE
+      .replace('{{INTERESTS}}', data.interests)
+      .replace('{{COMPETENCIES}}', data.competencies)
+      .replace('{{CHARACTER_TRAITS}}', data.characterTraits);
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+        model,
+        contents: prompt,
+    });
+    const fullText = response.text;
+    const throughLineMatch = fullText.match(/<through_line>(.*?)<\/through_line>/s);
+    const finalStatement = throughLineMatch ? throughLineMatch[1].trim() : 'Could not identify a final through line statement.';
+    const analysis = fullText.replace(/<through_line>.*?<\/through_line>/s, '').trim();
+
+    return { analysis, finalStatement };
+  },
+
+  generateMissionAndVision: async (throughLine: string): Promise<{ missions: string[]; visions: string[] }> => {
+    const prompt = PROMPT_3_MISSION_VISION.replace('{{THROUGH_LINE}}', throughLine);
+    const response: GenerateContentResponse = await ai.models.generateContent({
+        model,
+        contents: prompt,
+    });
+    const text = response.text;
+
+    const missionsMatch = text.match(/<mission_statements>([\s\S]*?)<\/mission_statements>/);
+    const visionsMatch = text.match(/<vision_statements>([\s\S]*?)<\/vision_statements>/);
+
+    const missions = missionsMatch ? missionsMatch[1].trim().split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim()) : [];
+    const visions = visionsMatch ? visionsMatch[1].trim().split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim()) : [];
+
+    return { missions, visions };
+  },
+
+  generateBrandEquityAnalysis: async (selfPerception: string, externalFeedback: string): Promise<string> => {
+    const prompt = PROMPT_AUDIT_EQUITY
+      .replace('{{SELF_PERCEPTION}}', selfPerception)
+      .replace('{{EXTERNAL_FEEDBACK}}', externalFeedback);
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+        model,
+        contents: prompt,
+    });
+    return response.text;
+  },
+};
